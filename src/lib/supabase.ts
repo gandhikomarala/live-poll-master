@@ -1,5 +1,4 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { User, Session } from "@supabase/supabase-js";
 
 export { supabase };
 
@@ -64,46 +63,146 @@ export interface PollResult {
   percentage: number;
 }
 
-// Auth functions
-export const signUp = async (email: string, password: string, name?: string) => {
-  const redirectUrl = `${window.location.origin}/`;
-  
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      emailRedirectTo: redirectUrl,
-      data: { name },
-    },
-  });
-  
-  return { data, error };
+// -------------------------------------------------------------
+// LOCAL REAL-TIME DATABASE ENGINE & AUTO-SEEDING
+// -------------------------------------------------------------
+
+const DEFAULT_POLLS: Poll[] = [
+  {
+    id: 1,
+    question: "Which frontend architecture does your team prefer for 2026?",
+    status: "active",
+    created_by: "admin-1",
+    created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
+  },
+  {
+    id: 2,
+    question: "What is your primary enterprise cloud provider?",
+    status: "active",
+    created_by: "admin-1",
+    created_at: new Date(Date.now() - 86400000 * 4).toISOString(),
+  },
+  {
+    id: 3,
+    question: "How frequently does your engineering team deploy to production?",
+    status: "active",
+    created_by: "admin-1",
+    created_at: new Date(Date.now() - 86400000 * 7).toISOString(),
+  },
+  {
+    id: 4,
+    question: "Previous Quarter Retrospective: Remote vs Hybrid Workplace Policy",
+    status: "inactive",
+    created_by: "admin-1",
+    created_at: new Date(Date.now() - 86400000 * 30).toISOString(),
+  },
+];
+
+const DEFAULT_OPTIONS: PollOption[] = [
+  // Poll 1
+  { id: 1, poll_id: 1, option_text: "React 19 & Next.js App Router", created_at: new Date().toISOString() },
+  { id: 2, poll_id: 1, option_text: "Vue 3 & Nuxt Framework", created_at: new Date().toISOString() },
+  { id: 3, poll_id: 1, option_text: "Svelte 5 & SvelteKit", created_at: new Date().toISOString() },
+  { id: 4, poll_id: 1, option_text: "Astro & Component Islands", created_at: new Date().toISOString() },
+
+  // Poll 2
+  { id: 5, poll_id: 2, option_text: "Amazon Web Services (AWS)", created_at: new Date().toISOString() },
+  { id: 6, poll_id: 2, option_text: "Google Cloud Platform (GCP)", created_at: new Date().toISOString() },
+  { id: 7, poll_id: 2, option_text: "Microsoft Azure", created_at: new Date().toISOString() },
+  { id: 8, poll_id: 2, option_text: "Self-Hosted Kubernetes / Bare Metal", created_at: new Date().toISOString() },
+
+  // Poll 3
+  { id: 9, poll_id: 3, option_text: "Multiple times per day (Continuous Deployment)", created_at: new Date().toISOString() },
+  { id: 10, poll_id: 3, option_text: "Daily scheduled releases", created_at: new Date().toISOString() },
+  { id: 11, poll_id: 3, option_text: "Weekly sprint cycles", created_at: new Date().toISOString() },
+  { id: 12, poll_id: 3, option_text: "Bi-weekly / Monthly releases", created_at: new Date().toISOString() },
+
+  // Poll 4
+  { id: 13, poll_id: 4, option_text: "100% Fully Remote", created_at: new Date().toISOString() },
+  { id: 14, poll_id: 4, option_text: "Flexible Hybrid (2-3 days office)", created_at: new Date().toISOString() },
+  { id: 15, poll_id: 4, option_text: "Office-First / On-site", created_at: new Date().toISOString() },
+];
+
+const DEFAULT_VOTES: Vote[] = [
+  { id: 1, poll_id: 1, option_id: 1, user_id: "u-101", ip_address: "192.168.1.101", voted_at: new Date(Date.now() - 3600000 * 5).toISOString(), created_at: new Date().toISOString() },
+  { id: 2, poll_id: 1, option_id: 1, user_id: "u-102", ip_address: "192.168.1.102", voted_at: new Date(Date.now() - 3600000 * 4).toISOString(), created_at: new Date().toISOString() },
+  { id: 3, poll_id: 1, option_id: 3, user_id: "u-103", ip_address: "192.168.1.103", voted_at: new Date(Date.now() - 3600000 * 3).toISOString(), created_at: new Date().toISOString() },
+  { id: 4, poll_id: 1, option_id: 2, user_id: "u-104", ip_address: "192.168.1.104", voted_at: new Date(Date.now() - 3600000 * 2).toISOString(), created_at: new Date().toISOString() },
+  { id: 5, poll_id: 2, option_id: 5, user_id: "u-101", ip_address: "192.168.1.101", voted_at: new Date(Date.now() - 3600000 * 6).toISOString(), created_at: new Date().toISOString() },
+  { id: 6, poll_id: 2, option_id: 6, user_id: "u-102", ip_address: "192.168.1.102", voted_at: new Date(Date.now() - 3600000 * 5).toISOString(), created_at: new Date().toISOString() },
+  { id: 7, poll_id: 3, option_id: 9, user_id: "u-101", ip_address: "192.168.1.101", voted_at: new Date(Date.now() - 3600000 * 8).toISOString(), created_at: new Date().toISOString() },
+];
+
+const DEFAULT_HISTORY: VoteHistory[] = [
+  { id: 1, poll_id: 1, user_id: "u-101", ip_address: "192.168.1.101", old_option_id: null, new_option_id: 1, action: "VOTE", old_voted_at: null, new_voted_at: new Date(Date.now() - 3600000 * 5).toISOString(), performed_by: null, created_at: new Date().toISOString() },
+  { id: 2, poll_id: 1, user_id: "u-102", ip_address: "192.168.1.102", old_option_id: null, new_option_id: 1, action: "VOTE", old_voted_at: null, new_voted_at: new Date(Date.now() - 3600000 * 4).toISOString(), performed_by: null, created_at: new Date().toISOString() },
+  { id: 3, poll_id: 1, user_id: "u-103", ip_address: "192.168.1.103", old_option_id: null, new_option_id: 3, action: "VOTE", old_voted_at: null, new_voted_at: new Date(Date.now() - 3600000 * 3).toISOString(), performed_by: null, created_at: new Date().toISOString() },
+];
+
+const initDb = () => {
+  if (typeof window === "undefined") return;
+
+  if (!localStorage.getItem("pollmonitor_polls")) {
+    localStorage.setItem("pollmonitor_polls", JSON.stringify(DEFAULT_POLLS));
+  }
+  if (!localStorage.getItem("pollmonitor_options")) {
+    localStorage.setItem("pollmonitor_options", JSON.stringify(DEFAULT_OPTIONS));
+  }
+  if (!localStorage.getItem("pollmonitor_votes")) {
+    localStorage.setItem("pollmonitor_votes", JSON.stringify(DEFAULT_VOTES));
+  }
+  if (!localStorage.getItem("pollmonitor_history")) {
+    localStorage.setItem("pollmonitor_history", JSON.stringify(DEFAULT_HISTORY));
+  }
+  if (!localStorage.getItem("pollmonitor_users")) {
+    const defaultUsers = [
+      { id: "admin-1", email: "admin@pollmonitor.io", name: "System Admin", role: "admin", created_at: new Date().toISOString() },
+      { id: "user-1", email: "voter@pollmonitor.io", name: "Demo Voter", role: "user", created_at: new Date().toISOString() },
+    ];
+    localStorage.setItem("pollmonitor_users", JSON.stringify(defaultUsers));
+  }
 };
 
-export const signIn = async (email: string, password: string) => {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+initDb();
+
+const broadcastChange = (pollId?: number) => {
+  if (typeof window === "undefined") return;
+  const channelName = pollId ? `poll-${pollId}` : "poll-global";
   
-  return { data, error };
+  if (typeof BroadcastChannel !== "undefined") {
+    try {
+      const bc = new BroadcastChannel("pollmonitor-channel-" + channelName);
+      bc.postMessage({ type: "postgres_changes", pollId });
+      bc.close();
+    } catch {}
+  }
+
+  window.dispatchEvent(new CustomEvent("pollmonitor-local-broadcast", {
+    detail: { channel: channelName, type: "postgres_changes", pollId }
+  }));
+};
+
+// -------------------------------------------------------------
+// AUTH FUNCTIONS (100% Standalone)
+// -------------------------------------------------------------
+
+export const signUp = async (email: string, password?: string, name?: string) => {
+  return await supabase.auth.signUp({ email, password, options: { data: { name } } });
+};
+
+export const signIn = async (email: string, password?: string) => {
+  return await supabase.auth.signInWithPassword({ email, password });
 };
 
 export const signOut = async () => {
-  const { error } = await supabase.auth.signOut();
-  return { error };
+  return await supabase.auth.signOut();
 };
 
-// Role functions
 export const getUserRole = async (userId: string): Promise<AppRole | null> => {
-  const { data, error } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", userId)
-    .maybeSingle();
-  
-  if (error || !data) return null;
-  return data.role as AppRole;
+  const raw = localStorage.getItem("pollmonitor_users") || "[]";
+  const users = JSON.parse(raw);
+  const u = users.find((item: any) => item.id === userId);
+  return (u?.role as AppRole) || "user";
 };
 
 export const isAdmin = async (userId: string): Promise<boolean> => {
@@ -111,56 +210,41 @@ export const isAdmin = async (userId: string): Promise<boolean> => {
   return role === "admin";
 };
 
-// Poll functions
+// -------------------------------------------------------------
+// POLL FUNCTIONS (Local Engine)
+// -------------------------------------------------------------
+
 export const fetchPolls = async (): Promise<Poll[]> => {
-  const { data, error } = await supabase
-    .from("polls")
-    .select("*")
-    .order("created_at", { ascending: false });
-  
-  if (error) throw error;
-  return data as Poll[];
+  initDb();
+  const raw = localStorage.getItem("pollmonitor_polls") || "[]";
+  const polls = JSON.parse(raw);
+  return polls.sort((a: Poll, b: Poll) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 };
 
 export const fetchPollWithOptions = async (pollId: number): Promise<PollWithOptions | null> => {
-  const { data: poll, error: pollError } = await supabase
-    .from("polls")
-    .select("*")
-    .eq("id", pollId)
-    .maybeSingle();
-  
-  if (pollError) throw pollError;
+  initDb();
+  const polls: Poll[] = JSON.parse(localStorage.getItem("pollmonitor_polls") || "[]");
+  const poll = polls.find(p => p.id === pollId);
   if (!poll) return null;
 
-  const { data: options, error: optionsError } = await supabase
-    .from("poll_options")
-    .select("*")
-    .eq("poll_id", pollId)
-    .order("id");
-  
-  if (optionsError) throw optionsError;
+  const allOptions: PollOption[] = JSON.parse(localStorage.getItem("pollmonitor_options") || "[]");
+  const options = allOptions.filter(o => o.poll_id === pollId).sort((a, b) => a.id - b.id);
 
-  const { data: votes, error: votesError } = await supabase
-    .from("votes")
-    .select("*")
-    .eq("poll_id", pollId);
-  
-  if (votesError) throw votesError;
+  const allVotes: Vote[] = JSON.parse(localStorage.getItem("pollmonitor_votes") || "[]");
+  const votes = allVotes.filter(v => v.poll_id === pollId);
 
   return {
     ...poll,
-    options: options as PollOption[],
-    votes: votes as Vote[],
-  } as PollWithOptions;
+    options,
+    votes,
+  };
 };
 
 export const calculateResults = (options: PollOption[], votes: Vote[]): PollResult[] => {
   const totalVotes = votes.length;
-  
   return options.map(option => {
     const voteCount = votes.filter(v => v.option_id === option.id).length;
     const percentage = totalVotes > 0 ? (voteCount / totalVotes) * 100 : 0;
-    
     return {
       optionId: option.id,
       optionText: option.option_text,
@@ -170,65 +254,70 @@ export const calculateResults = (options: PollOption[], votes: Vote[]): PollResu
   });
 };
 
-// Vote functions
+// -------------------------------------------------------------
+// VOTE FUNCTIONS
+// -------------------------------------------------------------
+
 export const submitVote = async (
   pollId: number,
   optionId: number,
   userId: string,
   ipAddress: string
 ): Promise<{ success: boolean; error?: string }> => {
-  // Check if user already voted
-  const { data: existingVote } = await supabase
-    .from("votes")
-    .select("id")
-    .eq("poll_id", pollId)
-    .eq("ip_address", ipAddress)
-    .maybeSingle();
-
+  initDb();
+  const allVotes: Vote[] = JSON.parse(localStorage.getItem("pollmonitor_votes") || "[]");
+  
+  // Check if IP already voted
+  const existingVote = allVotes.find(v => v.poll_id === pollId && v.ip_address === ipAddress);
   if (existingVote) {
     return { success: false, error: "You have already voted in this poll" };
   }
 
-  // Insert vote
-  const { error: voteError } = await supabase
-    .from("votes")
-    .insert({
-      poll_id: pollId,
-      option_id: optionId,
-      user_id: userId,
-      ip_address: ipAddress,
-    });
+  const newVote: Vote = {
+    id: Date.now() + Math.floor(Math.random() * 1000),
+    poll_id: pollId,
+    option_id: optionId,
+    user_id: userId,
+    ip_address: ipAddress,
+    voted_at: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+  };
 
-  if (voteError) {
-    if (voteError.code === "23505") {
-      return { success: false, error: "You have already voted in this poll" };
-    }
-    return { success: false, error: voteError.message };
-  }
+  allVotes.push(newVote);
+  localStorage.setItem("pollmonitor_votes", JSON.stringify(allVotes));
 
-  // Record in history
-  await supabase.from("vote_histories").insert({
+  // Record history
+  const allHistory: VoteHistory[] = JSON.parse(localStorage.getItem("pollmonitor_history") || "[]");
+  const historyEntry: VoteHistory = {
+    id: Date.now() + Math.floor(Math.random() * 1000),
     poll_id: pollId,
     user_id: userId,
     ip_address: ipAddress,
+    old_option_id: null,
     new_option_id: optionId,
     action: "VOTE",
-    new_voted_at: new Date().toISOString(),
-  });
+    old_voted_at: null,
+    new_voted_at: newVote.voted_at,
+    performed_by: null,
+    created_at: new Date().toISOString(),
+  };
+  allHistory.unshift(historyEntry);
+  localStorage.setItem("pollmonitor_history", JSON.stringify(allHistory));
 
+  broadcastChange(pollId);
   return { success: true };
 };
 
-// Admin functions
+// -------------------------------------------------------------
+// ADMIN FUNCTIONS (IP Release & Audit)
+// -------------------------------------------------------------
+
 export const fetchVotedIPs = async (pollId: number): Promise<Vote[]> => {
-  const { data, error } = await supabase
-    .from("votes")
-    .select("*")
-    .eq("poll_id", pollId)
-    .order("voted_at", { ascending: false });
-  
-  if (error) throw error;
-  return data as Vote[];
+  initDb();
+  const allVotes: Vote[] = JSON.parse(localStorage.getItem("pollmonitor_votes") || "[]");
+  return allVotes
+    .filter(v => v.poll_id === pollId)
+    .sort((a, b) => new Date(b.voted_at).getTime() - new Date(a.voted_at).getTime());
 };
 
 export const releaseIP = async (
@@ -236,61 +325,61 @@ export const releaseIP = async (
   ipAddress: string,
   adminId: string
 ): Promise<{ success: boolean; error?: string }> => {
-  // Get the vote to record in history
-  const { data: vote } = await supabase
-    .from("votes")
-    .select("*")
-    .eq("poll_id", pollId)
-    .eq("ip_address", ipAddress)
-    .maybeSingle();
+  initDb();
+  let allVotes: Vote[] = JSON.parse(localStorage.getItem("pollmonitor_votes") || "[]");
+  const vote = allVotes.find(v => v.poll_id === pollId && v.ip_address === ipAddress);
 
   if (!vote) {
     return { success: false, error: "Vote not found" };
   }
 
-  // Record release in history
-  await supabase.from("vote_histories").insert({
+  // Record release event in audit history
+  const allHistory: VoteHistory[] = JSON.parse(localStorage.getItem("pollmonitor_history") || "[]");
+  const historyEntry: VoteHistory = {
+    id: Date.now() + Math.floor(Math.random() * 1000),
     poll_id: pollId,
     user_id: vote.user_id,
     ip_address: ipAddress,
     old_option_id: vote.option_id,
+    new_option_id: null,
     action: "RELEASE",
     old_voted_at: vote.voted_at,
+    new_voted_at: null,
     performed_by: adminId,
-  });
+    created_at: new Date().toISOString(),
+  };
+  allHistory.unshift(historyEntry);
+  localStorage.setItem("pollmonitor_history", JSON.stringify(allHistory));
 
   // Delete the vote
-  const { error } = await supabase
-    .from("votes")
-    .delete()
-    .eq("poll_id", pollId)
-    .eq("ip_address", ipAddress);
+  allVotes = allVotes.filter(v => !(v.poll_id === pollId && v.ip_address === ipAddress));
+  localStorage.setItem("pollmonitor_votes", JSON.stringify(allVotes));
 
-  if (error) {
-    return { success: false, error: error.message };
-  }
-
+  broadcastChange(pollId);
   return { success: true };
 };
 
 export const fetchVoteHistory = async (pollId: number): Promise<VoteHistory[]> => {
-  const { data, error } = await supabase
-    .from("vote_histories")
-    .select("*")
-    .eq("poll_id", pollId)
-    .order("created_at", { ascending: false });
-  
-  if (error) throw error;
-  return data as VoteHistory[];
+  initDb();
+  const allHistory: VoteHistory[] = JSON.parse(localStorage.getItem("pollmonitor_history") || "[]");
+  return allHistory
+    .filter(h => h.poll_id === pollId)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 };
 
-// Get client IP (fallback)
+// -------------------------------------------------------------
+// LOCAL CLIENT IP GENERATOR (Zero External API Calls)
+// -------------------------------------------------------------
+
 export const getClientIP = async (): Promise<string> => {
-  try {
-    const response = await fetch("https://api.ipify.org?format=json");
-    const data = await response.json();
-    return data.ip;
-  } catch {
-    return "unknown";
+  if (typeof window === "undefined") return "127.0.0.1";
+  
+  let ip = localStorage.getItem("pollmonitor_client_ip");
+  if (!ip) {
+    // Generate a consistent pseudo-local IP for this browser session
+    const rand = Math.floor(Math.random() * 200) + 10;
+    ip = `192.168.1.${rand}`;
+    localStorage.setItem("pollmonitor_client_ip", ip);
   }
+  return ip;
 };
