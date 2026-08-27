@@ -1,0 +1,1 @@
+export const REALTIME_BROADCAST_VERSION = "2.5.0";
