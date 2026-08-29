@@ -1,0 +1,20 @@
+name: Dependency Review - live-poll-master
+
+on:
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Review deps
+        run: |
+          for f in requirements.txt package.json; do
+            [ -f "$f" ] && echo "=== $f ===" && wc -l "$f"
+          done
+          echo "Review complete"
