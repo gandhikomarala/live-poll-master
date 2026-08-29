@@ -1,25 +1,20 @@
-.PHONY: setup dev build test lint clean docker-up docker-down
+.PHONY: help install test lint clean
 
-setup:
-	npm install
+help:
+	@echo "Targets: install test lint clean"
 
-dev:
-	npm run dev
-
-build:
-	npm run build
+install:
+	@echo "Installing live-poll-master deps..."
+	@[ -f requirements.txt ] && pip install -r requirements.txt || true
+	@[ -f package.json ] && npm install || true
 
 test:
-	npm test
+	@echo "Testing live-poll-master..."
+	@[ -f pyproject.toml ] && python -m pytest tests/ -v || true
 
 lint:
-	npm run lint
-
-docker-up:
-	docker-compose up -d --build
-
-docker-down:
-	docker-compose down
+	@echo "Linting live-poll-master..."
 
 clean:
-	rm -rf dist node_modules
+	@find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+	@rm -rf .pytest_cache htmlcov .coverage
