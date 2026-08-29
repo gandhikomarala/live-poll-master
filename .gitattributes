@@ -1,0 +1,21 @@
+* text=auto
+*.py text diff=python
+*.js text diff=javascript
+*.ts text diff=javascript
+*.css text
+*.html text diff=html
+*.json text
+*.yml text
+*.yaml text
+*.md text diff=markdown
+*.sh text eol=lf
+*.bat text eol=crlf
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.svg text
+*.pdf binary
+*.zip binary
+Dockerfile text
+LICENSE text
