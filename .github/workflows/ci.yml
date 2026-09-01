@@ -1,0 +1,11 @@
+name: CI Pipeline
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Web Standalone Files
+        run: |
+          test -f index.html
+          test -f .nojekyll
